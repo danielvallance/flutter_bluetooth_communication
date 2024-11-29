@@ -1,8 +1,12 @@
 import 'dart:convert';
 import 'dart:developer';
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_bluetooth_communication/bluetooth_connection_control.dart';
+import 'package:flutter_bluetooth_communication/received_message_display.dart';
 
 void main() {
+  FlutterBluePlus.setLogLevel(LogLevel.verbose, color: true);
   runApp(const BluetoothTransceiverApp());
 }
 
@@ -44,6 +48,8 @@ class BluetoothTransceiverHomePage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
+            const ReceivedMessageDisplay(
+                message: "TODO: display received Bluetooth data"),
             TextField(
               controller: _controller,
               decoration: const InputDecoration(
@@ -56,6 +62,7 @@ class BluetoothTransceiverHomePage extends StatelessWidget {
               onPressed: _handlePress,
               child: const Text('Send'),
             ),
+            const BluetoothConnectionControl(),
           ],
         ),
       ),
