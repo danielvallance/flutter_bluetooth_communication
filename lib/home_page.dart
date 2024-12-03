@@ -2,14 +2,29 @@ import 'dart:convert';
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_bluetooth_communication/bluetooth_connection_control.dart';
 
 import 'received_message_display.dart';
 
-class BluetoothTransceiverHomePage extends StatelessWidget {
+class BluetoothTransceiverHomePage extends StatefulWidget {
   BluetoothTransceiverHomePage({super.key});
 
+  @override
+  State<BluetoothTransceiverHomePage> createState() =>
+      _BluetoothTransceiverHomePageState();
+}
+
+class _BluetoothTransceiverHomePageState
+    extends State<BluetoothTransceiverHomePage> {
   final TextEditingController _controller = TextEditingController();
+
+  List<ScanResult> _bluetoothPeripherals = [];
+
+  void _setBluetoothPeripherals(List<ScanResult> bluetoothPeriperals) {
+    _bluetoothPeripherals = bluetoothPeriperals;
+    setState(() {});
+  }
 
   void _handlePress() {
     String message = _controller.text;
@@ -42,7 +57,9 @@ class BluetoothTransceiverHomePage extends StatelessWidget {
               onPressed: _handlePress,
               child: const Text('Send'),
             ),
-            const BluetoothConnectionControl(),
+            BluetoothConnectionControl(
+                setBluetoothPeripherals: _setBluetoothPeripherals,
+                bluetoothPeripherals: _bluetoothPeripherals),
           ],
         ),
       ),
