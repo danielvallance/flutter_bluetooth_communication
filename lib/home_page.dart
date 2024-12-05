@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 
@@ -20,10 +21,22 @@ class _BluetoothTransceiverHomePageState
   final TextEditingController _controller = TextEditingController();
 
   List<ScanResult> _bluetoothPeripherals = [];
+  BluetoothDevice? _connectedDevice;
 
   void _setBluetoothPeripherals(List<ScanResult> bluetoothPeriperals) {
-    _bluetoothPeripherals = bluetoothPeriperals;
-    setState(() {});
+    setState(() {
+      _bluetoothPeripherals = bluetoothPeriperals;
+    });
+  }
+
+  void _setConnectedDevice(BluetoothDevice? connectedDevice) {
+    setState(() {
+      _connectedDevice = connectedDevice;
+    });
+  }
+
+  BluetoothDevice? _getConnectedDevice() {
+    return _connectedDevice;
   }
 
   void _handlePress() {
@@ -43,23 +56,29 @@ class _BluetoothTransceiverHomePageState
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            const ReceivedMessageDisplay(
-                message: "TODO: display received Bluetooth data"),
-            TextField(
-              controller: _controller,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: 'Enter text to send over Bluetooth',
+            if (_connectedDevice != null) ...[
+              Text(
+                  "Connected to device ${_connectedDevice?.advName ?? _connectedDevice?.remoteId}"),
+              const ReceivedMessageDisplay(
+                  message: "TODO: display received Bluetooth data"),
+              TextField(
+                controller: _controller,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  labelText: 'Enter text to send over Bluetooth',
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _handlePress,
-              child: const Text('Send'),
-            ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _handlePress,
+                child: const Text('Send'),
+              )
+            ],
             BluetoothConnectionControl(
                 setBluetoothPeripherals: _setBluetoothPeripherals,
-                bluetoothPeripherals: _bluetoothPeripherals),
+                bluetoothPeripherals: _bluetoothPeripherals,
+                setConnectedDevice: _setConnectedDevice,
+                getConnectedDevice: _getConnectedDevice),
           ],
         ),
       ),
