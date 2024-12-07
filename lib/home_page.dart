@@ -22,6 +22,23 @@ class _BluetoothTransceiverHomePageState
 
   List<ScanResult> _bluetoothPeripherals = [];
   BluetoothDevice? _connectedDevice;
+  BluetoothCharacteristic? _readWriteCharacteristic;
+  String _message = "";
+
+  void _setMessage(String message) {
+    setState(() {
+      _message = message;
+    });
+  }
+
+  void _setReadWriteCharacteristic(
+      BluetoothCharacteristic? readWriteCharacteristic) {
+    _readWriteCharacteristic = readWriteCharacteristic;
+  }
+
+  BluetoothCharacteristic? _getReadWriteCharacteristic() {
+    return _readWriteCharacteristic;
+  }
 
   void _setBluetoothPeripherals(List<ScanResult> bluetoothPeriperals) {
     setState(() {
@@ -39,10 +56,26 @@ class _BluetoothTransceiverHomePageState
     return _connectedDevice;
   }
 
-  void _handlePress() {
+  void _handlePress() async {
     String message = _controller.text;
-    String base64message = base64.encode(message.codeUnits);
-    log('Text entered: $message base64 encoding: $base64message');
+    if (message.isEmpty) return;
+
+    try {
+      List<int> bytes = utf8.encode(message);
+      await _readWriteCharacteristic
+          ?.write(bytes, withoutResponse: true)
+          .then((_) {
+        _controller.clear();
+        log('Message sent: $message');
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not send message ${e.toString()}.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -59,8 +92,7 @@ class _BluetoothTransceiverHomePageState
             if (_connectedDevice != null) ...[
               Text(
                   "Connected to device ${_connectedDevice?.advName ?? _connectedDevice?.remoteId}"),
-              const ReceivedMessageDisplay(
-                  message: "TODO: display received Bluetooth data"),
+              ReceivedMessageDisplay(message: _message),
               TextField(
                 controller: _controller,
                 decoration: const InputDecoration(
@@ -78,7 +110,10 @@ class _BluetoothTransceiverHomePageState
                 setBluetoothPeripherals: _setBluetoothPeripherals,
                 bluetoothPeripherals: _bluetoothPeripherals,
                 setConnectedDevice: _setConnectedDevice,
-                getConnectedDevice: _getConnectedDevice),
+                getConnectedDevice: _getConnectedDevice,
+                setReadWriteCharacteristic: _setReadWriteCharacteristic,
+                getReadWriteCharacteristic: _getReadWriteCharacteristic,
+                setMessage: _setMessage)
           ],
         ),
       ),

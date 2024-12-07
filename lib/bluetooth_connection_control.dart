@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_bluetooth_communication/utilities.dart';
 
 class BluetoothConnectionControl extends StatefulWidget {
   final void Function(List<ScanResult> bluetoothPeriperals)
@@ -10,13 +12,20 @@ class BluetoothConnectionControl extends StatefulWidget {
   final List<ScanResult> bluetoothPeripherals;
   final void Function(BluetoothDevice? connectedDevice) setConnectedDevice;
   final BluetoothDevice? Function() getConnectedDevice;
+  final void Function(BluetoothCharacteristic? readWriteCharacteristic)
+      setReadWriteCharacteristic;
+  final void Function(String message) setMessage;
+  final BluetoothCharacteristic? Function() getReadWriteCharacteristic;
 
   const BluetoothConnectionControl(
       {super.key,
       required this.setBluetoothPeripherals,
       required this.bluetoothPeripherals,
       required this.setConnectedDevice,
-      required this.getConnectedDevice});
+      required this.getConnectedDevice,
+      required this.setReadWriteCharacteristic,
+      required this.getReadWriteCharacteristic,
+      required this.setMessage});
 
   @override
   State<BluetoothConnectionControl> createState() =>
@@ -27,7 +36,8 @@ class _BluetoothConnectionControlState
     extends State<BluetoothConnectionControl> {
   bool _isScanning = false;
   BluetoothDevice? _connectingDevice;
-  late StreamSubscription<BluetoothConnectionState>? _disconnectionSubscription;
+  StreamSubscription<BluetoothConnectionState>? _disconnectionSubscription;
+  StreamSubscription<List<int>>? _notifySubscription;
 
   late StreamSubscription<List<ScanResult>> _bluetoothPeripheralSubscription;
 
@@ -43,6 +53,10 @@ class _BluetoothConnectionControlState
 
   @override
   void dispose() {
+    BluetoothDevice? connectedDevice = widget.getConnectedDevice();
+    if (connectedDevice != null) {
+      _cancelConnection(connectedDevice);
+    }
     FlutterBluePlus.cancelWhenScanComplete(_bluetoothPeripheralSubscription);
     super.dispose();
   }
@@ -84,11 +98,20 @@ class _BluetoothConnectionControlState
   }
 
   Future<void> _cancelConnection(BluetoothDevice device) async {
-    await _disconnectionSubscription?.cancel();
+    await _disconnectionSubscription?.cancel().catchError((e) {
+      log(e);
+    });
     _disconnectionSubscription = null;
 
-    await device.disconnect(queue: false);
+    await _notifySubscription?.cancel().catchError((e) {
+      log(e);
+    });
+    _notifySubscription = null;
 
+    await device.disconnect(queue: false).catchError((e) {
+      log(e);
+    });
+    widget.setReadWriteCharacteristic(null);
     setState(() {
       _connectingDevice = null;
       widget.setConnectedDevice(null);
@@ -102,24 +125,66 @@ class _BluetoothConnectionControlState
       setState(() {
         _connectingDevice = device;
       });
+      BluetoothCharacteristic? readWriteCharacteristic;
+
       try {
         await device.connect(mtu: null);
+        readWriteCharacteristic = await getReadWriteCharacteristic(device);
+
+        if (readWriteCharacteristic == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'Could not find service offered by the chosen device with the required characteristics.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          await _cancelConnection(device);
+          return;
+        }
+
+        await readWriteCharacteristic.setNotifyValue(true);
       } catch (e) {
-        log(e.toString());
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Failed to connect to device: ${e.toString()}"),
+            backgroundColor: Colors.red,
+          ),
+        );
 
         await _cancelConnection(device);
 
         return;
       }
 
+      _notifySubscription =
+          readWriteCharacteristic.onValueReceived.listen((utf8Bytes) {
+        try {
+          widget.setMessage(utf8.decode(utf8Bytes));
+        } catch (e) {
+          widget.setMessage("Could not decode received bytes: ${e.toString()}");
+        }
+      });
+
+      final notifySubscriptionCopy = _notifySubscription;
+      if (notifySubscriptionCopy != null) {
+        device.cancelWhenDisconnected(notifySubscriptionCopy);
+      }
+
       _disconnectionSubscription =
           device.connectionState.listen((BluetoothConnectionState state) async {
         if (state == BluetoothConnectionState.disconnected) {
-          log("Device with ID ${device.remoteId} disconnected");
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Device with ID ${device.remoteId} disconnected"),
+              backgroundColor: Colors.red,
+            ),
+          );
           await _cancelConnection(device);
         }
       });
 
+      widget.setReadWriteCharacteristic(readWriteCharacteristic);
       setState(() {
         _connectingDevice = null;
         widget.setConnectedDevice(device);
